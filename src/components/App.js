@@ -1,10 +1,9 @@
-import React, { useEffect } from 'react'
-import './App.css'
-import { ApolloClient } from 'apollo-client'
-import { InMemoryCache } from 'apollo-cache-inmemory'
-import { HttpLink } from 'apollo-link-http'
-import { useQuery } from '@apollo/react-hooks'
+import React, { useEffect, Component } from 'react'
+
+import '../styles/App.css'
 import gql from 'graphql-tag'
+import { Query } from 'react-apollo'
+
 
 import { withStyles, makeStyles } from '@material-ui/core/styles';
 import Table from '@material-ui/core/Table';
@@ -66,26 +65,18 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export const client = new ApolloClient({
-  link: new HttpLink({
-    uri: 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2'
-  }),
-  fetchOptions: {
-    mode: 'no-cors'
-  },
-  cache: new InMemoryCache()
-})
 
-export const numberFormat = (value) =>
-  new Intl.NumberFormat('en-IN', {
+
+const numberFormat = (value) =>
+  new Intl.NumberFormat('en-EN', {
     style: 'currency',
     currency: 'USD'
   }).format(value);
 
 
 const NEW_PAIRS = gql `
-    query pairs{
-    pairs(where: {reserveUSD_gt:5000} first: 20, 
+    query pairs($reserveUSD: Int!){
+    pairs(where: {reserveUSD_lt:$reserveUSD} first: 200, 
     orderBy: createdAtTimestamp, orderDirection: desc) {
       id
       txCount
@@ -105,11 +96,13 @@ const NEW_PAIRS = gql `
   }
  `
 
-function App() {
+ class App extends Component {
+  render() {
 
-  const { loading: newLoading, data: newData } = useQuery(NEW_PAIRS)
-  const newPairs = newData && newData.pairs
+//  const newPairs = newData && newData.pairs
   const classes = useStyles();
+  var rowNumber = 0;
+
 
   //console.table(newData);
   return (
@@ -118,36 +111,45 @@ function App() {
       <div className={classes.paper}>
       <Typography variant="h4" color="inherit" noWrap className={classes.toolbarTitle}>UNITRACK</Typography>
       <Typography className={classes.root}>
+
       <TableContainer component={Paper}>
       <Table className={classes.table} size="small" aria-label="a dense table">
       <TableHead>
           <TableRow>
+          <StyledTableCell></StyledTableCell>
           <StyledTableCell>Token 1 Uniswap/Etherscan</StyledTableCell>
           <StyledTableCell>Token 2 Uniswap/Etherscan</StyledTableCell>
           <StyledTableCell>TX count</StyledTableCell>
           <StyledTableCell>Volume USD</StyledTableCell>
           <StyledTableCell>Current liquidty</StyledTableCell>
-          <StyledTableCell>Creation date</StyledTableCell>
+          <StyledTableCell>Pool Creation</StyledTableCell>
           <StyledTableCell>Uniswap</StyledTableCell>
           </TableRow>
         </TableHead>
         <TableBody>
         {
-          newLoading
-          ? 'Loading pairs data...'
-          :   
-
-           newPairs.map(function(item, key) {
+ 
+          <Query query={NEW_PAIRS}>
+        
+         {({ loading, error, data }) => {
+          if (loading) return <div>Fetching</div>
+          if (error) return <div>Error</div>
+    
+          const newPairs = data.pairs
+    
+          newPairs.map(function(item, key) {
             
             var d = new Date(item.createdAtTimestamp * 1000);
             var formattedDate = d.getDate() + "/" + (d.getMonth() + 1); // + "-" + d.getFullYear();
             var hours = (d.getHours() < 10) ? "0" + d.getHours() : d.getHours();
             var minutes = (d.getMinutes() < 10) ? "0" + d.getMinutes() : d.getMinutes();
             var formattedTime = hours + ":" + minutes;
-            
             formattedDate = formattedDate + " " + formattedTime;
+
+            rowNumber++;
             return (
-               <TableRow key = {key}>
+               <StyledTableRow key = {key}>
+                   <TableCell>{rowNumber}</TableCell>
                    <TableCell>{item.token0.name} <Link href= {"https://uniswap.info/token/" + item.token0.id} target="_blank" variant="body2">1</Link>  <Link href= {"https://etherscan.io/address/" + item.token0.id} target="_blank">2</Link></TableCell>  
                    <TableCell>{item.token1.name} <Link href= {"https://uniswap.info/token/" + item.token1.id} target="_blank" variant="body2">1</Link>  <Link href= {"https://etherscan.io/address/" + item.token1.id} target="_blank">2</Link></TableCell>                  
                    <TableCell>{item.txCount}</TableCell>
@@ -155,10 +157,12 @@ function App() {
                    <TableCell>{numberFormat(item.reserveUSD)}</TableCell>
                    <TableCell>{formattedDate}</TableCell>                  
                    <TableCell><Link href= {"https://uniswap.info/pair/" + item.id} target="_blank" variant="body2">View pair</Link></TableCell> 
-               </TableRow>
+               </StyledTableRow>
              )
-          
+
           })
+        }}
+        </Query>
         }
         </TableBody>
         </Table>
@@ -168,5 +172,8 @@ function App() {
     </Container>
   )
 }
+
+}
+
 
 export default App
